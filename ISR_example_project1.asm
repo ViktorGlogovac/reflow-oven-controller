@@ -213,3 +213,4 @@ loop_b:
 	Display_BCD(BCD_counter) ; This macro is also in 'LCD_4bit.inc'
     ljmp loop
 END
+;test note
