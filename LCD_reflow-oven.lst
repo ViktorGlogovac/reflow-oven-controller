@@ -1,0 +1,305 @@
+0000              1   ; ISR_example.asm: a) Increments/decrements a BCD variable every half second using
+0000              2   ; an ISR for timer 2; b) Generates a 2kHz square wave at pin P1.1 using
+0000              3   ; an ISR for timer 0; and c) in the 'main' loop it displays the variable
+0000              4   ; incremented/decremented using the ISR for timer 2 on the LCD.  Also resets it to 
+0000              5   ; zero if the 'BOOT' pushbutton connected to P4.5 is pressed.
+                  7   $LIST
+0000              9   
+0000             10   
+0000             11   shift_PB   equ P2.4
+0000             12   TEMP_SOAK_PB equ P4.5
+0000             13   TIME_SOAK_PB equ P0.6
+0000             14   TEMP_REFL_PB equ P0.3
+0000             15   TIME_REFL_PB equ P0.0
+0000             16   
+0030             17   dseg at 0x30
+0030             18   temp_soak: ds 1
+0031             19   time_soak: ds 1
+0032             20   temp_refl: ds 1
+0033             21   time_refl: ds 1
+0034             22   
+0000 020141      23       ljmp main
+0003             24   
+0003             25   cseg
+0003             26   ; These 'equ' must match the hardware wiring
+0003             27   LCD_RS equ P3.2
+0003             28   
+0003             29   LCD_E  equ P3.3
+0003             30   LCD_D4 equ P3.4
+0003             31   LCD_D5 equ P3.5
+0003             32   LCD_D6 equ P3.6
+0003             33   LCD_D7 equ P3.7
+0003             34   
+                 36   $LIST
+00AF             38   
+00AF             39   ;                     1234567890123456    <- This helps determine the location of the counter
+00AF 54532020    40   Initial_Message:  db 'TS  tS  TR  tR', 0
+     74532020
+     54522020
+     745200
+00BE             41   
+                 42   Change_8bit_Variable MAC
+                 43   jb %0, %2
+                 44   Wait_Milli_Seconds(#50) ; de-bounce
+                 45   jb %0, %2
+                 46   jnb %0, $
+                 47   jb SHIFT_PB, skip%Mb
+                 48   dec %1
+                 49   sjmp skip%Ma
+                 50   skip%Mb:
+                 51   inc %1
+                 52   skip%Ma:
+                 53   ENDMAC
+00BE             54   
+                 55   getbyte mac
+                 56   clr a
+                 57   movc a, @a+dptr
+                 58   mov %0, a
+                 59   inc dptr
+                 60   Endmac
+00BE             61   
+                 62   loadbyte mac
+                 63   mov a, %0
+                 64   movx @dptr, a
+                 65   inc dptr
+                 66   endmac
+00BE             67   
+00BE             68   SendToLCD:
+00BE 75F064      69   mov b, #100
+00C1 84          70   div ab
+00C2 4430        71   orl a, #0x30 ; Convert hundreds to ASCII
+00C4 120053      72   lcall ?WriteData ; Send to LCD
+00C7 E5F0        73   mov a, b    ; Remainder is in register b
+00C9 75F00A      74   mov b, #10
+00CC 84          75   div ab
+00CD 4430        76   orl a, #0x30 ; Convert tens to ASCII
+00CF 120053      77   lcall ?WriteData; Send to LCD
+00D2 E5F0        78   mov a, b
+00D4 4430        79   orl a, #0x30 ; Convert units to ASCII
+00D6 120053      80   lcall ?WriteData; Send to LCD
+00D9 22          81   ret
+00DA             82   
+00DA             83   Save_Configuration:
+00DA 75D108      84   mov FCON, #0x08 ; Page Buffer Mapping Enabled (FPS = 1)
+00DD 907F80      85   mov dptr, #0x7f80 ; Last page of flash memory
+00E0             86   ; Save variables
+00E0 E530        87   mov a, temp_soak
+00E2 F0          87   movx @dptr, a
+00E3 A3          87   inc dptr ; @0x7f80
+00E4 E531        88   mov a, time_soak
+00E6 F0          88   movx @dptr, a
+00E7 A3          88   inc dptr ; @0x7f81
+00E8 E532        89   mov a, temp_refl
+00EA F0          89   movx @dptr, a
+00EB A3          89   inc dptr ; @0x7f82
+00EC E533        90   mov a, time_refl
+00EE F0          90   movx @dptr, a
+00EF A3          90   inc dptr ; @0x7f83
+00F0 7455        91   mov a, #0x55
+00F2 F0          91   movx @dptr, a
+00F3 A3          91   inc dptr ; First key value @0x7f84
+00F4 74AA        92   mov a, #0xAA
+00F6 F0          92   movx @dptr, a
+00F7 A3          92   inc dptr ; Second key value @0x7f85
+00F8 75D100      93   mov FCON, #0x00 ; Page Buffer Mapping Disabled (FPS = 0)
+00FB 43D240      94   orl EECON, #0b01000000 ; Enable auto-erase on next write sequence
+00FE 75D150      95   mov FCON, #0x50 ; Write trigger first byte
+0101 75D1A0      96   mov FCON, #0xA0 ; Write trigger second byte
+0104             97   ; CPU idles until writing of flash completes.
+0104 75D100      98   mov FCON, #0x00 ; Page Buffer Mapping Disabled (FPS = 0)
+0107 53D2BF      99   anl EECON, #0b10111111 ; Disable auto-erase
+010A 22         100   ret
+010B            101   
+010B            102   Load_Configuration:
+010B 907F84     103   mov dptr, #0x7f84 ; First key value location.
+010E E4         104   clr a
+010F 93         104   movc a, @a+dptr
+0110 F8         104   mov R0, a
+0111 A3         104   inc dptr ; 0x7f84 should contain 0x55
+0112 B8551F     105   cjne R0, #0x55, Load_Defaults
+0115 E4         106   clr a
+0116 93         106   movc a, @a+dptr
+0117 F8         106   mov R0, a
+0118 A3         106   inc dptr ; 0x7f85 should contain 0xAA
+0119 B8AA18     107   cjne R0, #0xAA, Load_Defaults
+011C            108   ; Keys are good.  Get stored values.
+011C 907F80     109   mov dptr, #0x7f80
+011F E4         110   clr a
+0120 93         110   movc a, @a+dptr
+0121 F530       110   mov temp_soak, a
+0123 A3         110   inc dptr ; 0x7f80
+0124 E4         111   clr a
+0125 93         111   movc a, @a+dptr
+0126 F531       111   mov time_soak, a
+0128 A3         111   inc dptr ; 0x7f81
+0129 E4         112   clr a
+012A 93         112   movc a, @a+dptr
+012B F532       112   mov temp_refl, a
+012D A3         112   inc dptr ; 0x7f82
+012E E4         113   clr a
+012F 93         113   movc a, @a+dptr
+0130 F533       113   mov time_refl, a
+0132 A3         113   inc dptr ; 0x7f83
+0133 22         114   ret
+0134            115   
+0134            116   Load_Defaults:
+0134 753096     117   mov temp_soak, #150
+0137 75312D     118   mov time_soak, #45
+013A 7532E1     119   mov temp_refl, #225
+013D 75331E     120   mov time_refl, #30
+0140 22         121   ret
+0141            122   
+0141            123   ;---------------------------------;
+0141            124   ; Main program. Includes hardware ;
+0141            125   ; initialization and 'forever'    ;
+0141            126   ; loop.                           ;
+0141            127   ;---------------------------------;
+0141            128   main:
+0141            129            ; Initialization
+0141 75817F     130       mov SP, #0x7F
+0144 75E600     131       mov P0M0, #0
+0147 75E700     132       mov P0M1, #0
+014A 12005D     133       lcall LCD_4BIT
+014D            134       ; For convenience a few handy macros are included in 'LCD_4bit.inc':
+014D 12010B     135       lcall Load_Configuration
+0150 C0E0       136            push acc
+0152 7401       136            mov a, #1
+0154 14         136            dec a
+0155 120094     136            lcall ?Set_Cursor_1 ; Select column and row
+0158 D0E0       136            pop acc
+015A C083       137            push dph
+015C C082       137            push dpl
+015E C0E0       137            push acc
+0160 9000AF     137            mov dptr, #Initial_Message
+0163 120087     137            lcall ?Send_Constant_String
+0166 D0E0       137            pop acc
+0168 D082       137            pop dpl
+016A D083       137            pop dph
+016C C0E0       138            push acc
+016E 7401       138            mov a, #1
+0170 14         138            dec a
+0171 120092     138            lcall ?Set_Cursor_2 ; Select column and row
+0174 D0E0       138            pop acc
+0176 E530       139       mov a, temp_soak
+0178 1200BE     140            lcall SendToLCD
+017B C0E0       141            push acc
+017D 7405       141            mov a, #5
+017F 14         141            dec a
+0180 120092     141            lcall ?Set_Cursor_2 ; Select column and row
+0183 D0E0       141            pop acc
+0185 E531       142       mov a, time_soak
+0187 1200BE     143            lcall SendToLCD
+018A C0E0       144            push acc
+018C 7409       144            mov a, #9
+018E 14         144            dec a
+018F 120092     144            lcall ?Set_Cursor_2 ; Select column and row
+0192 D0E0       144            pop acc
+0194 E532       145       mov a, temp_refl
+0196 1200BE     146            lcall SendToLCD
+0199 C0E0       147            push acc
+019B 740D       147            mov a, #13
+019D 14         147            dec a
+019E 120092     147            lcall ?Set_Cursor_2 ; Select column and row
+01A1 D0E0       147            pop acc
+01A3 E533       148       mov a, time_refl
+01A5 1200BE     149            lcall SendToLCD
+01A8            150            
+01A8            151            ; After initialization the program stays in this 'forever' loop
+01A8            152   loop:
+01A8 20C52A     153   jb TEMP_SOAK_PB, loop_a
+01AB C002       153            push AR2
+01AD 7A32       153            mov R2, #50
+01AF 12000E     153            lcall ?Wait_Milli_Seconds
+01B2 D002       153            pop AR2 ; de-bounce
+01B4 20C51E     153   jb TEMP_SOAK_PB, loop_a
+01B7 30C5FD     153   jnb TEMP_SOAK_PB, $
+01BA 20A404     153   jb SHIFT_PB, skip26b
+01BD 1530       153   dec temp_soak
+01BF 8002       153   sjmp skip26a
+01C1            153   skip26b:
+01C1 0530       153   inc temp_soak
+01C3            153   skip26a:
+01C3 C0E0       154            push acc
+01C5 7401       154            mov a, #1
+01C7 14         154            dec a
+01C8 120092     154            lcall ?Set_Cursor_2 ; Select column and row
+01CB D0E0       154            pop acc
+01CD E530       155            mov a, temp_soak
+01CF 1200BE     156            lcall SendToLCD
+01D2 1200DA     157            lcall Save_Configuration
+01D5            158   loop_a:
+01D5 20862A     159   jb TIME_SOAK_PB, loop_b
+01D8 C002       159            push AR2
+01DA 7A32       159            mov R2, #50
+01DC 12000E     159            lcall ?Wait_Milli_Seconds
+01DF D002       159            pop AR2 ; de-bounce
+01E1 20861E     159   jb TIME_SOAK_PB, loop_b
+01E4 3086FD     159   jnb TIME_SOAK_PB, $
+01E7 20A404     159   jb SHIFT_PB, skip29b
+01EA 1531       159   dec time_soak
+01EC 8002       159   sjmp skip29a
+01EE            159   skip29b:
+01EE 0531       159   inc time_soak
+01F0            159   skip29a:
+01F0 C0E0       160            push acc
+01F2 7405       160            mov a, #5
+01F4 14         160            dec a
+01F5 120092     160            lcall ?Set_Cursor_2 ; Select column and row
+01F8 D0E0       160            pop acc
+01FA E531       161            mov a, time_soak
+01FC 1200BE     162            lcall SendToLCD
+01FF 1200DA     163            lcall Save_Configuration        
+0202            164   loop_b:
+0202 20832A     165   jb TEMP_REFL_PB, loop_c
+0205 C002       165            push AR2
+0207 7A32       165            mov R2, #50
+0209 12000E     165            lcall ?Wait_Milli_Seconds
+020C D002       165            pop AR2 ; de-bounce
+020E 20831E     165   jb TEMP_REFL_PB, loop_c
+0211 3083FD     165   jnb TEMP_REFL_PB, $
+0214 20A404     165   jb SHIFT_PB, skip32b
+0217 1532       165   dec temp_refl
+0219 8002       165   sjmp skip32a
+021B            165   skip32b:
+021B 0532       165   inc temp_refl
+021D            165   skip32a:
+021D C0E0       166            push acc
+021F 7409       166            mov a, #9
+0221 14         166            dec a
+0222 120092     166            lcall ?Set_Cursor_2 ; Select column and row
+0225 D0E0       166            pop acc
+0227 E532       167            mov a, temp_refl
+0229 1200BE     168            lcall SendToLCD
+022C 1200DA     169            lcall Save_Configuration        
+022F            170   
+022F            171   loop_c:
+022F 20802A     172   jb TIME_REFL_PB, loop_d
+0232 C002       172            push AR2
+0234 7A32       172            mov R2, #50
+0236 12000E     172            lcall ?Wait_Milli_Seconds
+0239 D002       172            pop AR2 ; de-bounce
+023B 20801E     172   jb TIME_REFL_PB, loop_d
+023E 3080FD     172   jnb TIME_REFL_PB, $
+0241 20A404     172   jb SHIFT_PB, skip35b
+0244 1533       172   dec time_refl
+0246 8002       172   sjmp skip35a
+0248            172   skip35b:
+0248 0533       172   inc time_refl
+024A            172   skip35a:
+024A C0E0       173            push acc
+024C 740D       173            mov a, #13
+024E 14         173            dec a
+024F 120092     173            lcall ?Set_Cursor_2 ; Select column and row
+0252 D0E0       173            pop acc
+0254 E533       174            mov a, time_refl
+0256 1200BE     175            lcall SendToLCD
+0259 1200DA     176            lcall Save_Configuration        
+025C            177   
+025C            178   
+025C            179   
+025C            180   loop_d:
+025C            181   
+025C            182   
+025C            183   
+025C 0201A8     184       ljmp loop
+025F            185   END
