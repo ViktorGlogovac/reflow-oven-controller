@@ -12,6 +12,8 @@ DSEG at 30H
 x:   ds 4
 y:   ds 4
 bcd: ds 5
+th_temp: ds 4
+am_temp: ds 4
 result: ds 4
 
 
@@ -91,6 +93,7 @@ find_temp:
 	lcall Amb_temp
 	clr AMTH_flag
 	;LCD_cursor(2,7) ;NOT SURE
+	lcall add_th_am
 	ljmp find_temp
 
 Th:
@@ -102,42 +105,73 @@ Th:
 
 
 Thermo_temp:
-mov x+0, result+0
-mov x+1, result+1
-mov x+2, #0
-mov x+3, #0
-; Multiply by 4091000
-load_Y(4091000)
-lcall mul32
-; Divide result by 1023
-load_Y(1023)
-lcall div32
-; divide 41 from result
-load_Y(41)
-lcall div32
-; divide by gain
-load_Y(333)
-lcall div32
-; The 4-bytes of x have the temperature in binary
-lcall hex2bcd
+	mov x+0, result+0
+	mov x+1, result+1
+	mov x+2, #0
+	mov x+3, #0
+	; Multiply by 4091000
+	load_Y(4091000)
+	lcall mul32
+	; Divide result by 1023
+	load_Y(1023)
+	lcall div32
+	; divide 41 from result
+	load_Y(41)
+	lcall div32
+	; divide by gain
+	load_Y(383)
+	lcall div32
+	; The 4-bytes of x have the temperature in binary
+	mov th_temp+0, x+0
+	mov th_temp+1, x+1
+	mov th_temp+2, x+2
+	mov th_temp+3, x+3
+	lcall hex2bcd
 
 
 Amb_temp:
-mov x+0, result+0
-mov x+1, result+1
-mov x+2, #0
-mov x+3, #0
-; Multiply by 410
-load_Y(410)
-lcall mul32
-; Divide result by 1023
-load_Y(1023)
-lcall div32
-; Subtract 273 from result
-load_Y(273)
-lcall sub32
-; The 4-bytes of x have the temperature in binary
-lcall hex2bcd
+	mov x+0, result+0
+	mov x+1, result+1
+	mov x+2, #0
+	mov x+3, #0
+	; Multiply by 410
+	load_Y(410)
+	lcall mul32
+	; Divide result by 1023
+	load_Y(1023)
+	lcall div32
+	; Subtract 273 from result
+	load_Y(273)
+	lcall sub32
+	; The 4-bytes of x have the temperature in binary
+	mov am_temp+0, x+0
+	mov am_temp+1, x+1
+	mov am_temp+2, x+2
+	mov am_temp+3, x+3
+	lcall hex2bcd
+
+add_th_am:
+   mov x+3, am_temp+3
+   mov x+2, am_temp+2
+   mov x+1, am_temp+1
+   mov x+0, am_temp+0
+
+   ;-----------------
+   mov y+3, th_temp+3
+   mov y+2, th_temp+2
+   mov y+1, th_temp+1
+   mov y+0, th_temp+0 ;
+
+   ;-----------------
+   lcall add32
+   load_y(5) ; offest can be reset
+   lcall add32
+   mov total_temp+3,  x+3
+   mov total_temp+2,  x+2
+   mov total_temp+1,  x+1
+   mov total_temp+0,  x+0
+   lcall hex2bcd
+   ret
 
 convert_ADC:
 	clr CE_ADC
