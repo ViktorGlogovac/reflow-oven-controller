@@ -7,16 +7,16 @@ $NOLIST
 $MODLP51RC2
 $LIST
 
-shift_PB   equ P2.4
-TEMP_SOAK_PB equ P4.5
-TIME_SOAK_PB equ P0.6
-TEMP_REFL_PB equ P0.3
-TIME_REFL_PB equ P0.0
+shift_PB   equ P0.7
+TEMP_SOAK_PB equ P0.6
+TIME_SOAK_PB equ P0.4
+TEMP_REFL_PB equ P0.2
+TIME_REFL_PB equ P0.1
 
-CE_ADC    EQU  P2.0 
-MY_MOSI   EQU  P2.1  
-MY_MISO   EQU  P2.2 
-MY_SCLK   EQU  P2.3 
+CE_ADC    EQU  P1.0 
+MY_MOSI   EQU  P1.1  
+MY_MISO   EQU  P1.2 
+MY_SCLK   EQU  P1.3 
 
 dseg at 0x30
 dseg at 0x30
