@@ -7,12 +7,16 @@ $NOLIST
 $MODLP51RC2
 $LIST
 
-
 shift_PB   equ P2.4
 TEMP_SOAK_PB equ P4.5
 TIME_SOAK_PB equ P0.6
 TEMP_REFL_PB equ P0.3
 TIME_REFL_PB equ P0.0
+
+CE_ADC    EQU  P2.0 
+MY_MOSI   EQU  P2.1  
+MY_MISO   EQU  P2.2 
+MY_SCLK   EQU  P2.3 
 
 dseg at 0x30
 dseg at 0x30
@@ -34,8 +38,6 @@ minutes: ds 1
 count_ms: ds 2
 Count1ms:	ds 2 ; Used to determine when half second has passed
 BCD_counter:	ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
-seconds:	ds 1
-minutes:	ds 1
 hours: 		ds 1
 alarm_min:	ds 1
 alarm_hour:	ds 1
@@ -103,13 +105,9 @@ Timer2_Init:
     setb TR2  ; Enable timer 2
 	ret
 
-;---------------------------------;
-; ISR for timer 2                 ;
-;---------------------------------;
 Timer2_ISR:
 	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-	cpl P1.0 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
-	
+
 	; The two registers used in the ISR must be saved in the stack
 	push acc
 	push psw
@@ -121,36 +119,51 @@ Timer2_ISR:
 	inc Count1ms+1
 
 Inc_Done:
-	; Check if half second has passed
+	; Do the PWM thing
+	; Check if Count1ms > pwm_ratio (this is a 16-bit compare)
+	clr c
+	mov a, pwm_ratio+0
+	subb a, Count1ms+0
+	mov a, pwm_ratio+1
+	subb a, Count1ms+1
+	; if Count1ms > pwm_ratio  the carry is set.  Just copy the carry to the pwm output pin:
+	mov PWM_OUTPUT, c
+
+	; Check if a second has passed
 	mov a, Count1ms+0
-	cjne a, #low(500), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+	cjne a, #low(1000), Timer2_ISR_done
 	mov a, Count1ms+1
-	cjne a, #high(500), Timer2_ISR_done
+	cjne a, #high(1000), Timer2_ISR_done
 	
-	; 500 milliseconds have passed.  Set a flag so the main program knows
-	setb half_seconds_flag ; Let the main program know half second had passed
-	cpl TR0 ; Enable/disable timer/counter 0. This line creates a beep-silence-beep-silence sound.
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a
-	; Increment the BCD counter
-	mov a, BCD_counter
-	jnb UPDOWN, Timer2_ISR_decrement
-	add a, #0x01
-	sjmp Timer2_ISR_da
-Timer2_ISR_decrement:
-	add a, #0x99 ; Adding the 10-complement of -1 is like subtracting 1.
-Timer2_ISR_da:
-	da a ; Decimal adjust instruction.  Check datasheet for more details!
-	mov BCD_counter, a
+	
+	; Increment binary variable 'seconds'
+	inc seconds
 	
 Timer2_ISR_done:
 	pop psw
 	pop acc
 	reti
 
-
+DO_SPI_G:
+mov R1, #0 ; Received byte stored in R1
+mov R2, #8            ; Loop counter (8-bits)
+DO_SPI_G_LOOP:
+mov a, R0             ; Byte to write is in R0
+rlc a                 ; Carry flag has bit to write
+mov R0, a
+mov MY_MOSI, c
+setb MY_SCLK          ; Transmit
+mov c, MY_MISO        ; Read received bit
+mov a, R1             ; Save received bit in R1
+rlc a
+mov R1, a
+clr MY_SCLK
+djnz R2, DO_SPI_G_LOOP
+ret
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'TS  tS  TR  tR', 0
 
@@ -297,4 +310,30 @@ loop_d:
 
 
     ljmp loop
+
+Forever:
+clr CE_ADC
+mov R0, #00000001B
+lcall DO_SPI_G
+
+mov R0, a
+lcall DO_SPI_G
+mov a, R1
+anl a, #00000011B
+mov result+1, a
+
+mov R0, #55H
+lcall DO_SPI_G
+mov result, R1
+setb CE_ADC
+
+lcall find_temp
+
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+
+ljmp Forever
+
 END
