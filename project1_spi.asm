@@ -86,12 +86,18 @@ DO_SPI_G_LOOP:
  
  
 find_temp:
-	jnb AMTH_flag, Th
+	;jnb AMTH_flag, Th
+	Th:
+	mov b, #1
+	lcall convert_ADC
+	lcall Thermo_temp
+	;setb AMTH_flag
+	;lcall find_temp
 	AM: 
 	mov b, #0
 	lcall convert_ADC
 	lcall Amb_temp
-	clr AMTH_flag
+	;clr AMTH_flag
 	;LCD_cursor(2,7) ;NOT SURE
 	lcall add_th_am
 	ljmp find_temp
@@ -155,17 +161,15 @@ add_th_am:
    mov x+2, am_temp+2
    mov x+1, am_temp+1
    mov x+0, am_temp+0
-
    ;-----------------
    mov y+3, th_temp+3
    mov y+2, th_temp+2
    mov y+1, th_temp+1
    mov y+0, th_temp+0 ;
-
    ;-----------------
    lcall add32
-   load_y(5) ; offest can be reset
-   lcall add32
+   ;load_y(5) ; offest can be reset
+   ;lcall add32
    mov total_temp+3,  x+3
    mov total_temp+2,  x+2
    mov total_temp+1,  x+1
@@ -188,10 +192,6 @@ convert_ADC:
 	lcall DO_SPI_G
 	mov Result, R1     ; R1 contains bits 0 to 7.  Save result low.
 	setb CE_ADC
-	Wait_Milli_Seconds(#100)
-	Wait_Milli_Seconds(#100)
-	Wait_Milli_Seconds(#100)
-	Wait_Milli_Seconds(#100)
 	ret
 
  
