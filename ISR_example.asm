@@ -103,13 +103,9 @@ Timer2_Init:
     setb TR2  ; Enable timer 2
 	ret
 
-;---------------------------------;
-; ISR for timer 2                 ;
-;---------------------------------;
 Timer2_ISR:
 	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-	cpl P1.0 ; To check the interrupt rate with oscilloscope. It must be precisely a 1 ms pulse.
-	
+
 	; The two registers used in the ISR must be saved in the stack
 	push acc
 	push psw
@@ -121,35 +117,34 @@ Timer2_ISR:
 	inc Count1ms+1
 
 Inc_Done:
-	; Check if half second has passed
+	; Do the PWM thing
+	; Check if Count1ms > pwm_ratio (this is a 16-bit compare)
+	clr c
+	mov a, pwm_ratio+0
+	subb a, Count1ms+0
+	mov a, pwm_ratio+1
+	subb a, Count1ms+1
+	; if Count1ms > pwm_ratio  the carry is set.  Just copy the carry to the pwm output pin:
+	mov PWM_OUTPUT, c
+
+	; Check if a second has passed
 	mov a, Count1ms+0
-	cjne a, #low(500), Timer2_ISR_done ; Warning: this instruction changes the carry flag!
+	cjne a, #low(1000), Timer2_ISR_done
 	mov a, Count1ms+1
-	cjne a, #high(500), Timer2_ISR_done
+	cjne a, #high(1000), Timer2_ISR_done
 	
-	; 500 milliseconds have passed.  Set a flag so the main program knows
-	setb half_seconds_flag ; Let the main program know half second had passed
-	cpl TR0 ; Enable/disable timer/counter 0. This line creates a beep-silence-beep-silence sound.
 	; Reset to zero the milli-seconds counter, it is a 16-bit variable
 	clr a
 	mov Count1ms+0, a
 	mov Count1ms+1, a
-	; Increment the BCD counter
-	mov a, BCD_counter
-	jnb UPDOWN, Timer2_ISR_decrement
-	add a, #0x01
-	sjmp Timer2_ISR_da
-Timer2_ISR_decrement:
-	add a, #0x99 ; Adding the 10-complement of -1 is like subtracting 1.
-Timer2_ISR_da:
-	da a ; Decimal adjust instruction.  Check datasheet for more details!
-	mov BCD_counter, a
+	
+	; Increment binary variable 'seconds'
+	inc seconds
 	
 Timer2_ISR_done:
 	pop psw
 	pop acc
 	reti
-
 
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'TS  tS  TR  tR', 0
