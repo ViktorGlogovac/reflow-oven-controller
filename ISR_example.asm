@@ -7,12 +7,16 @@ $NOLIST
 $MODLP51RC2
 $LIST
 
-
 shift_PB   equ P2.4
 TEMP_SOAK_PB equ P4.5
 TIME_SOAK_PB equ P0.6
 TEMP_REFL_PB equ P0.3
 TIME_REFL_PB equ P0.0
+
+CE_ADC    EQU  P2.0 
+MY_MOSI   EQU  P2.1  
+MY_MISO   EQU  P2.2 
+MY_SCLK   EQU  P2.3 
 
 dseg at 0x30
 dseg at 0x30
@@ -34,8 +38,6 @@ minutes: ds 1
 count_ms: ds 2
 Count1ms:	ds 2 ; Used to determine when half second has passed
 BCD_counter:	ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
-seconds:	ds 1
-minutes:	ds 1
 hours: 		ds 1
 alarm_min:	ds 1
 alarm_hour:	ds 1
@@ -146,6 +148,22 @@ Timer2_ISR_done:
 	pop acc
 	reti
 
+DO_SPI_G:
+mov R1, #0 ; Received byte stored in R1
+mov R2, #8            ; Loop counter (8-bits)
+DO_SPI_G_LOOP:
+mov a, R0             ; Byte to write is in R0
+rlc a                 ; Carry flag has bit to write
+mov R0, a
+mov MY_MOSI, c
+setb MY_SCLK          ; Transmit
+mov c, MY_MISO        ; Read received bit
+mov a, R1             ; Save received bit in R1
+rlc a
+mov R1, a
+clr MY_SCLK
+djnz R2, DO_SPI_G_LOOP
+ret
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'TS  tS  TR  tR', 0
 
@@ -292,4 +310,30 @@ loop_d:
 
 
     ljmp loop
+
+Forever:
+clr CE_ADC
+mov R0, #00000001B
+lcall DO_SPI_G
+
+mov R0, a
+lcall DO_SPI_G
+mov a, R1
+anl a, #00000011B
+mov result+1, a
+
+mov R0, #55H
+lcall DO_SPI_G
+mov result, R1
+setb CE_ADC
+
+lcall find_temp
+
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+Wait_Milli_Seconds(#100)
+
+ljmp Forever
+
 END
