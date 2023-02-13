@@ -90,7 +90,7 @@ find_temp:
 	lcall convert_ADC
 	lcall Amb_temp
 	clr AMTH_flag
-	LCD_cursor(2,7) ;NOT SURE
+	;LCD_cursor(2,7) ;NOT SURE
 	ljmp find_temp
 
 Th:
@@ -154,7 +154,10 @@ convert_ADC:
 	lcall DO_SPI_G
 	mov Result, R1     ; R1 contains bits 0 to 7.  Save result low.
 	setb CE_ADC
-	lcall Delay
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
 	ret
 
  
