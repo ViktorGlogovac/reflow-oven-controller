@@ -14,10 +14,10 @@ Pins Assignment
 | P0.5          |               |
 | P0.6          |TEMP_SOAK_PB   |
 | P0.7          |shift_PB       |
-| P1.0          |CE_ADC (temp)  |
-| P1.1          |MY_MOSI (temp) |
-| P1.2          |MY_MISO (temp) |
-| P1.3          |MY_SCLK (temp) |
+| P1.0          |MY_SCLK (temp) |
+| P1.1          |MY_MISO (temp) |
+| P1.2          |MY_MOSI (temp) |
+| P1.3          |CE_ADC (temp)  |
 | P1.4          |               |
 | P1.5          |               |
 | P1.6          |               |
