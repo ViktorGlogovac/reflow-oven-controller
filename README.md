@@ -6,14 +6,14 @@ Pins Assignment
 
 | PINS          |   Assignment  |
 | ------------- | ------------- |
-| P0.0          |               |
+| P0.0          |RESET_PB       |
 | P0.1          |TIME_REFL_PB   |
 | P0.2          |TEMP_REFL_PB   |
-| P0.3          |               |
-| P0.4          |TIME_SOAK_PB   |
-| P0.5          |               |
-| P0.6          |TEMP_SOAK_PB   |
-| P0.7          |shift_PB       |
+| P0.3          |TIME_SOAK_PB   |
+| P0.4          |TEMP_SOAK_PB   |
+| P0.5          |shift_PB       |
+| P0.6          |               |
+| P0.7          |               |
 | P1.0          |MY_SCLK (temp) |
 | P1.1          |MY_MISO (temp) |
 | P1.2          |MY_MOSI (temp) |
