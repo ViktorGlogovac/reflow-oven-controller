@@ -7,43 +7,19 @@ $NOLIST
 $MODLP51RC2
 $LIST
 
-shift_PB   equ P0.7
-TEMP_SOAK_PB equ P0.6
-TIME_SOAK_PB equ P0.4
+
+shift_PB   equ P0.5
+TEMP_SOAK_PB equ P0.4
+TIME_SOAK_PB equ P0.3
 TEMP_REFL_PB equ P0.2
 TIME_REFL_PB equ P0.1
-
-CE_ADC    EQU  P1.0 
-MY_MOSI   EQU  P1.1  
-MY_MISO   EQU  P1.2 
-MY_SCLK   EQU  P1.3 
+RESET_PB equ P0.0
 
 dseg at 0x30
-dseg at 0x30
-
-Result:     ds 2
-x:			ds 4
-y:			ds 4
-BCD:		ds 5
-
-state: ds 1
 temp_soak: ds 1
-Time_soak: ds 1
-Temp_refl: ds 1
-Time_refl: ds 1
-temp_Cooling: ds 1
-Oven_Power: ds 1
-seconds: ds 1
-minutes: ds 1
-count_ms: ds 2
-Count1ms:	ds 2 ; Used to determine when half second has passed
-BCD_counter:	ds 1 ; The BCD counter incrememted in the ISR and displayed in the main loop
-hours: 		ds 1
-alarm_min:	ds 1
-alarm_hour:	ds 1
-
-freq: ds 1
-speaker_time: ds 1
+time_soak: ds 1
+temp_refl: ds 1
+time_refl: ds 1
 
     ljmp main
 
@@ -56,114 +32,11 @@ LCD_D4 equ P3.4
 LCD_D5 equ P3.5
 LCD_D6 equ P3.6
 LCD_D7 equ P3.7
-;---------------------------------;
-; Routine to initialize the ISR   ;
-; for timer 0                     ;
-;---------------------------------;
-Timer0_Init:
-	mov a, TMOD
-	anl a, #0xf0 ; 11110000 Clear the bits for timer 0
-	orl a, #0x01 ; 00000001 Configure timer 0 as 16-timer
-	mov TMOD, a
-	mov TH0, #high(TIMER0_RELOAD)
-	mov TL0, #low(TIMER0_RELOAD)
-	; Set autoreload value
-	mov RH0, #high(TIMER0_RELOAD)
-	mov RL0, #low(TIMER0_RELOAD)
-	; Enable the timer and interrupts
-    setb ET0  ; Enable timer 0 interrupt
-    setb TR0  ; Start timer 0
-	ret
 
-;---------------------------------;
-; ISR for timer 0.  Set to execute;
-; every 1/4096Hz to generate a    ;
-; 2048 Hz square wave at pin P1.1 ;
-;---------------------------------;
-Timer0_ISR:
-	;clr TF0  ; According to the data sheet this is done for us already.
-	cpl SOUND_OUT ; Connect speaker to P1.1!
-	reti
+$NOLIST
+$include(LCD_4bit.inc) ; A library of LCD related functions and utility macros
+$LIST
 
-;---------------------------------;
-; Routine to initialize the ISR   ;
-; for timer 2                     ;
-;---------------------------------;
-Timer2_Init:
-	mov T2CON, #0 ; Stop timer/counter.  Autoreload mode.
-	mov TH2, #high(TIMER2_RELOAD)
-	mov TL2, #low(TIMER2_RELOAD)
-	; Set the reload value
-	mov RCAP2H, #high(TIMER2_RELOAD)
-	mov RCAP2L, #low(TIMER2_RELOAD)
-	; Init One millisecond interrupt counter.  It is a 16-bit variable made with two 8-bit parts
-	clr a
-	mov Count1ms+0, a
-	mov Count1ms+1, a
-	; Enable the timer and interrupts
-    setb ET2  ; Enable timer 2 interrupt
-    setb TR2  ; Enable timer 2
-	ret
-
-Timer2_ISR:
-	clr TF2  ; Timer 2 doesn't clear TF2 automatically. Do it in ISR
-
-	; The two registers used in the ISR must be saved in the stack
-	push acc
-	push psw
-	
-	; Increment the 16-bit one mili second counter
-	inc Count1ms+0    ; Increment the low 8-bits first
-	mov a, Count1ms+0 ; If the low 8-bits overflow, then increment high 8-bits
-	jnz Inc_Done
-	inc Count1ms+1
-
-Inc_Done:
-	; Do the PWM thing
-	; Check if Count1ms > pwm_ratio (this is a 16-bit compare)
-	clr c
-	mov a, pwm_ratio+0
-	subb a, Count1ms+0
-	mov a, pwm_ratio+1
-	subb a, Count1ms+1
-	; if Count1ms > pwm_ratio  the carry is set.  Just copy the carry to the pwm output pin:
-	mov PWM_OUTPUT, c
-
-	; Check if a second has passed
-	mov a, Count1ms+0
-	cjne a, #low(1000), Timer2_ISR_done
-	mov a, Count1ms+1
-	cjne a, #high(1000), Timer2_ISR_done
-	
-	; Reset to zero the milli-seconds counter, it is a 16-bit variable
-	clr a
-	mov Count1ms+0, a
-	mov Count1ms+1, a
-	
-	; Increment binary variable 'seconds'
-	inc seconds
-	
-Timer2_ISR_done:
-	pop psw
-	pop acc
-	reti
-
-DO_SPI_G:
-mov R1, #0 ; Received byte stored in R1
-mov R2, #8            ; Loop counter (8-bits)
-DO_SPI_G_LOOP:
-mov a, R0             ; Byte to write is in R0
-rlc a                 ; Carry flag has bit to write
-mov R0, a
-mov MY_MOSI, c
-setb MY_SCLK          ; Transmit
-mov c, MY_MISO        ; Read received bit
-mov a, R1             ; Save received bit in R1
-rlc a
-mov R1, a
-clr MY_SCLK
-djnz R2, DO_SPI_G_LOOP
-ret
 ;                     1234567890123456    <- This helps determine the location of the counter
 Initial_Message:  db 'TS  tS  TR  tR', 0
 
@@ -173,6 +46,7 @@ Wait_Milli_Seconds(#50) ; de-bounce
 jb %0, %2
 jnb %0, $
 jb SHIFT_PB, skip%Mb
+;jb RESET_PB, reset%Mb
 dec %1
 sjmp skip%Ma
 skip%Mb:
@@ -278,62 +152,55 @@ main:
 	
 	; After initialization the program stays in this 'forever' loop
 loop:
-	Change_8bit_Variable(TEMP_SOAK_PB, temp_soak, loop_a)
+
+loop_a:
+	Change_8bit_Variable(TEMP_SOAK_PB, temp_soak, loop_b)
+;	Change_8bit_Variable(RESET_PB, temp_soak, loop_a)
 	Set_Cursor(2, 1)
 	mov a, temp_soak
 	lcall SendToLCD
 	lcall Save_Configuration
-loop_a:
-	Change_8bit_Variable(TIME_SOAK_PB, time_soak, loop_b)
+loop_b:
+	Change_8bit_Variable(TIME_SOAK_PB, time_soak, loop_c)
+;	Change_8bit_Variable(RESET_PB, time_soak, loop_b)
 	Set_Cursor(2, 5)
 	mov a, time_soak
 	lcall SendToLCD
 	lcall Save_Configuration	
-loop_b:
-	Change_8bit_Variable(TEMP_REFL_PB, temp_refl, loop_c)
+loop_c:
+	Change_8bit_Variable(TEMP_REFL_PB, temp_refl, loop_d)
+;	Change_8bit_Variable(RESET_PB, temp_refl, loop_c)
 	Set_Cursor(2, 9)
 	mov a, temp_refl
 	lcall SendToLCD
 	lcall Save_Configuration	
 
-loop_c:
-	Change_8bit_Variable(TIME_REFL_PB, time_refl, loop_d)
+loop_d:
+	Change_8bit_Variable(TIME_REFL_PB, time_refl, loop_e)
+;	Change_8bit_Variable(RESET_PB, time_refl, loop_d)
 	Set_Cursor(2, 13)
 	mov a, time_refl
 	lcall SendToLCD
 	lcall Save_Configuration	
 
-
-
-loop_d:
-
-
-
+loop_e:
+	jnb RESET_PB, loop_1	
     ljmp loop
-
-Forever:
-clr CE_ADC
-mov R0, #00000001B
-lcall DO_SPI_G
-
-mov R0, a
-lcall DO_SPI_G
-mov a, R1
-anl a, #00000011B
-mov result+1, a
-
-mov R0, #55H
-lcall DO_SPI_G
-mov result, R1
-setb CE_ADC
-
-lcall find_temp
-
-Wait_Milli_Seconds(#100)
-Wait_Milli_Seconds(#100)
-Wait_Milli_Seconds(#100)
-Wait_Milli_Seconds(#100)
-
-ljmp Forever
-
-ENDs
+   
+loop_1:
+	lcall Load_Defaults
+	Set_Cursor(2, 1)
+	mov a, temp_soak
+	lcall SendToLCD
+	Set_Cursor(2, 5)
+	lcall SendToLCD
+	mov a, time_soak
+	Set_Cursor(2, 9)
+	mov a, temp_refl
+	lcall SendToLCD
+	Set_Cursor(2, 13)
+	mov a, time_refl
+	lcall SendToLCD
+	lcall Save_Configuration
+	ljmp loop
+END
