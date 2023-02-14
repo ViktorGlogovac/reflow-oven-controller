@@ -114,8 +114,8 @@ Thermo_temp:
 	mov x+1, result+1
 	mov x+2, #0
 	mov x+3, #0
-	; Multiply by 4091000
-	load_Y(4091000)
+	; Multiply by 4096000
+	load_Y(4096000)
 	lcall mul32
 	; Divide result by 1023
 	load_Y(1023)
