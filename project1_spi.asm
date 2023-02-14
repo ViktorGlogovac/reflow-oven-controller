@@ -1,11 +1,10 @@
 ; mathtest.asm:  Examples using math32.asm routines
-
 $NOLIST
 $MODLP51RC2
 $LIST
 
 org 0000H
-   ljmp MyProgram
+	ljmp MyProgram
 
 ; These register definitions needed by 'math32.inc'
 DSEG at 30H
@@ -15,7 +14,6 @@ bcd: ds 5
 th_temp: ds 4
 am_temp: ds 4
 result: ds 4
-
 
 BSEG
 mf: dbit 1
@@ -38,6 +36,7 @@ CE_ADC    EQU  P2.0
 MY_MOSI   EQU  P2.1  
 MY_MISO   EQU  P2.2 
 MY_SCLK   EQU  P2.3 
+
 $NOLIST
 $include(LCD_4bit.inc)
 $LIST
@@ -98,7 +97,7 @@ find_temp:
 	lcall convert_ADC
 	lcall Amb_temp
 	;clr AMTH_flag
-	;LCD_cursor(2,7) ;NOT SURE
+	LCD_cursor(2,7) ;NOT SURE
 	lcall add_th_am
 	ljmp find_temp
 
@@ -128,11 +127,30 @@ Thermo_temp:
 	load_Y(383)
 	lcall div32
 	; The 4-bytes of x have the temperature in binary
+	mov a, x+0
+	da a
+	mov x+0, a
+
+	mov a, x+1
+	da a
+	mov x+1, a
+
+	mov a, x+2
+	da a
+	mov x+2, a
+
+	mov a, x+3
+	da a
+	mov x+3, a
+
 	mov th_temp+0, x+0
 	mov th_temp+1, x+1
 	mov th_temp+2, x+2
 	mov th_temp+3, x+3
-	lcall hex2bcd
+
+	
+
+	;lcall hex2bcd
 
 
 Amb_temp:
@@ -150,11 +168,26 @@ Amb_temp:
 	load_Y(273)
 	lcall sub32
 	; The 4-bytes of x have the temperature in binary
+	mov a, x+0
+	da a
+	mov x+0, a
+
+	mov a, x+1
+	da a
+	mov x+1, a
+
+	mov a, x+2
+	da a
+	mov x+2, a
+
+	mov a, x+3
+	da a
+	mov x+3, a
 	mov am_temp+0, x+0
 	mov am_temp+1, x+1
 	mov am_temp+2, x+2
 	mov am_temp+3, x+3
-	lcall hex2bcd
+	;lcall hex2bcd
 
 add_th_am:
    mov x+3, am_temp+3
@@ -246,6 +279,19 @@ MyProgram:
     lcall LCD_4BIT
 	Set_Cursor(1, 1)
     Send_Constant_String(#Test_msg)
+	mov R1, #222
+    mov R0, #166
+    djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
+    djnz R1, $-4 ; 22.51519us*222=4.998ms
+    ; Now we can safely proceed with the configuration
+    clr	TR1
+    anl	TMOD, #0x0f
+    orl	TMOD, #0x20
+    orl	PCON,#0x80
+    mov	TH1,#T1LOAD
+    mov	TL1,#T1LOAD
+    setb TR1
+    mov	SCON,#0x52
 	lcall INIT_SPI
 	ljmp find_temp
 	
