@@ -1,0 +1,31 @@
+audio             location  length
+
+start             36B0      4650
+ramp to soak      83AA      709C
+soak              C21D      48C3
+ramp to peak      13B4D     6CA6
+reflow            1AAAC     4D10
+cooling           1F764     4B1C
+finish            23B74     5B53
+degrees celcius   29252     95FA
+1                 32C82     3770
+2                 364EF     4649
+3                 3AA7A     4312
+4                 3F006     4156
+5                 43454     3F1C
+6                 473EF     4588
+7                 4B87D     4884
+8                 50003     3E80
+9                 54488     4059
+10                583AD     4844
+20                5D0A5     4B7C
+30                61CA0     4C79
+40                6681C     4B3D
+50                6B15E     4312
+60                6F5AC     43D0
+70                73C35     52A9
+80                79197     440F
+90                7D762     4010
+100               81937     4BBB
+200               8672D     63BD
+teen              8C9EC     5C90
