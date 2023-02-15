@@ -32,10 +32,10 @@ LCD_D4 equ P3.4
 LCD_D5 equ P3.5
 LCD_D6 equ P3.6
 LCD_D7 equ P3.7
-CE_ADC    EQU  P2.0 
-MY_MOSI   EQU  P2.1  
-MY_MISO   EQU  P2.2 
-MY_SCLK   EQU  P2.3 
+CE_ADC    EQU  P1.3 
+MY_MOSI   EQU  P1.2  
+MY_MISO   EQU  P1.1 
+MY_SCLK   EQU  P1.0 
 
 $NOLIST
 $include(LCD_4bit.inc)
@@ -114,8 +114,8 @@ Thermo_temp:
 	mov x+1, result+1
 	mov x+2, #0
 	mov x+3, #0
-	; Multiply by 4096000
-	load_Y(4096000)
+	; Multiply by 4091000
+	load_Y(4091000)
 	lcall mul32
 	; Divide result by 1023
 	load_Y(1023)
