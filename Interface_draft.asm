@@ -1,4 +1,5 @@
 
+
 ; standard library
 $NOLIST
 $MODLP52
@@ -7,9 +8,12 @@ $include(macros.inc)
 $include(math32.inc)
 $include(LCD_4bit.inc)
 
-
-TIMER2_RATE   EQU 1000     ; 1000Hz, for a timer tick of 1ms
-TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
+CLK         equ     22118400
+BAUD        equ     115200
+T0_RELOAD   equ     (65536-(CLK/4096))
+T1_RELOAD   equ     (0x100-CLK/(16*BAUD))
+T2_RELOAD   equ     (65536-(CLK/1000))
+TIME_RATE   equ     1000
 
 ; Reset vector
 org 0x0000
@@ -76,6 +80,7 @@ y:          ds  4
 
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
+reset_timer_flag: dbit 1
 
 Initial_Message:  db 'TS  tS  TR  tR', 0
 time_soak_msg:    db 'SOAK TEMP:     <', 0
@@ -173,6 +178,31 @@ Inc_Done:
 	mov a, sec_counter
 	add a, #0x01
 
+Inc_Done_PWM:
+	; Do the PWM thing
+	; Check if Count1ms > pwm_ratio (this is a 16-bit compare)
+	clr c
+	mov a, pwm_ratio+0
+	subb a, Count1ms+0
+	mov a, pwm_ratio+1
+	subb a, Count1ms+1
+	; if Count1ms > pwm_ratio  the carry is set.  Just copy the carry to the pwm output pin:
+	mov PWM_OUTPUT, c
+
+	; Check if a second has passed
+	mov a, Count1ms+0
+	cjne a, #low(1000), Timer2_ISR_done
+	mov a, Count1ms+1
+	cjne a, #high(1000), Timer2_ISR_done
+	
+	; Reset to zero the milli-seconds counter, it is a 16-bit variable
+	clr a
+	mov Count1ms+0, a
+	mov Count1ms+1, a
+	
+	; Increment binary variable 'seconds'
+	inc seconds
+
 Timer2_ISR_da:
 	da a ; Decimal adjust instruction.  Check datasheet for more details!
 	cjne a, #0x05, sec ;check if 5 sec have passed
@@ -182,13 +212,16 @@ sec:
 	mov sec_counter, a
 
 Timer2_ISR_seconds:
+    jnb seconds_flag, Timer2_ISR_done
     mov a, seconds
     add a, #0x01
     da a 
-    cjne a, #0x60
+    jb reset_timer_flag, Reset_seconds
+
+Reset_seconds:
+clr seconds
+
     
-
-
 	
 Timer2_ISR_done:
 	pop psw
@@ -259,12 +292,24 @@ main:
     mov P0M1, #0
     mov sec_counter, #0x00
     mov seconds, #0x00
+    mov state, #0
     lcall Timer2_Init
     setb EA
     setb half_seconds_flag
     ;initialize
 
     lcall LCD_4BIT
+
+
+Update_LCD:
+    ; update main screen values
+    LCD_cursor(2, 12)
+    LCD_printBCD(seconds)
+    lcall SendVoltage
+    Display_formated_BCD(Oven_temp, 1, 12)
+    LCD_cursor(1, 16)
+    LCD_printChar(#'C')
+    ljmp 	main_button_start
 
 FSM1:
     mov a, FSM1_state
@@ -273,19 +318,20 @@ FSM1:
 
 FSM1_ERROR:
     LCD_cursor(1,1)
-    LCD_cursor(1,1)
   	LCD_print(#error)
   	LCD_cursor(2,1)
   	LCD_print(#error2)
+    Wait_Milli_Seconds(#500)
     ljmp FSM1_state0
+
+FSM1_Return_state0:
+
 
 FSM1_state0:
 
+    jb START_PB, START_PRESSED
     cjne a, #0, FSM1_state1
     mov pwm, #0
-
-
-    lcall LCD_4BIT
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
     lcall Load_Configuration
 	Set_Cursor(1, 1)
@@ -359,7 +405,10 @@ loop_1:
 	mov a, time_refl
 	lcall SendToLCD
 	lcall Save_Configuration
-	ljmp loop
+    ljmp loop
+
+START_PRESSED:
+mov FSM1_state, #1
 
 
 FSM1_state0_done:
@@ -369,14 +418,15 @@ FSM1_state1:
 cjne a, #1, FSM1_state2
 mov pwm, #100
 mov a, #60d
-
-
-mov sec, #0
+subb a, seconds
+jz FSM1_ERROR
 mov a, temp_soak
 clr c
 subb a, temp
 jnc FSM1_state1_done
 mov FSM1_state, #2
+setb reset_timer_flag
+clr reset_timer_flag
 
 FSM1_state1_done:
 ljmp FSM2
@@ -389,6 +439,8 @@ clr c
 subb a, sec
 jnc FSM1_state2_done
 mov FSM1_state, #3
+setb reset_timer_flag
+clr reset_timer_flag
 
 FSM1_state2_done:
 ljmp FSM2
@@ -396,11 +448,13 @@ ljmp FSM2
 FSM1_state3:
 cjne a, #3, FSM1_state4
 mov pwm, #100
-mov a, #220, reflow_temp
+mov a, reflow_temp
 clr c
 subb a, oven_temp
 jnc FSM1_state3_done
-mov FSM1_state, #3
+setb reset_timer_flag
+clr reset_timer_flag
+mov FSM1_state, #4
 
 FSM1_state3_done:
 ljmp FSM2
