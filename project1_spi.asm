@@ -99,8 +99,12 @@ find_temp:
 	lcall convert_ADC
 	lcall Amb_temp
 	;clr AMTH_flag
-	Set_Cursor(2,7) ;NOT SURE
 	lcall add_th_am
+	Set_Cursor(2,7) ;NOT SURE
+	Display_BCD(bcd+3)
+	Display_BCD(bcd+2)
+	Display_BCD(bcd+1)
+	Display_BCD(bcd+0)
 	ljmp find_temp
 
 
