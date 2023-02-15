@@ -14,6 +14,7 @@ bcd: ds 5
 th_temp: ds 4
 am_temp: ds 4
 result: ds 4
+total_temp: ds 4
 
 BSEG
 mf: dbit 1
@@ -236,28 +237,7 @@ convert_ADC:
 	setb CE_ADC
 	ret
 
- 
-; Sends 10-digit BCD number in bcd to the LCD
-Display_10_digit_BCD:
-	Set_Cursor(2, 7)
-	Display_BCD(bcd+4)
-	Display_BCD(bcd+3)
-	Display_BCD(bcd+2)
-	Display_BCD(bcd+1)
-	Display_BCD(bcd+0)
-	; Replace all the zeros to the left with blanks
-	Set_Cursor(2, 7)
-	Left_blank(bcd+4, skip_blank)
-	Left_blank(bcd+3, skip_blank)
-	Left_blank(bcd+2, skip_blank)
-	Left_blank(bcd+1, skip_blank)
-	mov a, bcd+0
-	anl a, #0f0h
-	swap a
-	jnz skip_blank
-	Display_char(#' ')
-skip_blank:
-	ret
+
 
 ; We can display a number any way we want.  In this case with
 ; four decimal places.
