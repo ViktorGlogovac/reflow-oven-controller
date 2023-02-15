@@ -14,7 +14,6 @@ bcd: ds 5
 th_temp: ds 4
 am_temp: ds 4
 result: ds 4
-total_temp: ds 4
 
 BSEG
 mf: dbit 1
@@ -37,7 +36,6 @@ CE_ADC    EQU  P1.3
 MY_MOSI   EQU  P1.2  
 MY_MISO   EQU  P1.1 
 MY_SCLK   EQU  P1.0 
-T1LOAD    EQU (0x100 - (22118400/(16*115200)))
 
 $NOLIST
 $include(LCD_4bit.inc)
@@ -99,13 +97,9 @@ find_temp:
 	lcall convert_ADC
 	lcall Amb_temp
 	;clr AMTH_flag
+	;LCD_cursor(2,7) ;NOT SURE
 	lcall add_th_am
-	Set_Cursor(2,7) ;NOT SURE
-	Display_BCD(bcd+3)
-	Display_BCD(bcd+2)
-	Display_BCD(bcd+1)
-	Display_BCD(bcd+0)
-	ljmp find_temp
+	ret
 
 
 Thermo_temp:
@@ -146,9 +140,6 @@ Thermo_temp:
 	mov th_temp+1, x+1
 	mov th_temp+2, x+2
 	mov th_temp+3, x+3
-
-	
-
 	;lcall hex2bcd
 
 
@@ -207,7 +198,26 @@ add_th_am:
    mov total_temp+1,  x+1
    mov total_temp+0,  x+0
    lcall hex2bcd
-   ret
+   Display_10_digit_BCD:
+	Set_Cursor(2, 7)
+	Display_BCD(bcd+4)
+	Display_BCD(bcd+3)
+	Display_BCD(bcd+2)
+	Display_BCD(bcd+1)
+	Display_BCD(bcd+0)
+	; Replace all the zeros to the left with blanks
+	Set_Cursor(2, 7)
+	Left_blank(bcd+4, skip_blank)
+	Left_blank(bcd+3, skip_blank)
+	Left_blank(bcd+2, skip_blank)
+	Left_blank(bcd+1, skip_blank)
+	mov a, bcd+0
+	anl a, #0f0h
+	swap a
+	jnz skip_blank
+	Display_char(#' ')
+   skip_blank:
+    ret
 
 convert_ADC:
 	clr CE_ADC
@@ -268,7 +278,7 @@ wait_for_P4_5:
 	jnb P4.5, $ ; loop while the button is pressed
 	ret
 
-Test_msg:  db 'Temperature :', 0
+Test_msg:  db 'Temperature:', 0
 
 MyProgram:
 	mov sp, #07FH ; Initialize the stack pointer
@@ -278,20 +288,27 @@ MyProgram:
     lcall LCD_4BIT
 	Set_Cursor(1, 1)
     Send_Constant_String(#Test_msg)
-	mov R1, #222
-    mov R0, #166
-    djnz R0, $   ; 3 cycles->3*45.21123ns*166=22.51519us
-    djnz R1, $-4 ; 22.51519us*222=4.998ms
-    ; Now we can safely proceed with the configuration
-    clr	TR1
-    anl	TMOD, #0x0f
-    orl	TMOD, #0x20
-    orl	PCON,#0x80
-    mov	TH1,#T1LOAD
-    mov	TL1,#T1LOAD
-    setb TR1
-    mov	SCON,#0x52
-	lcall INIT_SPI
-	ljmp find_temp
+	
+	Forever:
+	clr CE_ADC
+	mov R0, #00000001B
+	lcall DO_SPI_G
+
+	mov R0, a
+	lcall DO_SPI_G
+	mov a, R1
+	anl a, #00000011B
+	mov total_temp+1, a
+
+	mov R0, #55H
+	lcall DO_SPI_G
+	mov total_temp, R1
+	setb CE_ADC
+
+	lcall find_temp
+
+	Wait_Milli_Seconds(#100)
+	Wait_Milli_Seconds(#100)
+	ljmp Forever
 	
 END
