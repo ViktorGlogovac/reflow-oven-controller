@@ -14,6 +14,7 @@ bcd: ds 5
 th_temp: ds 4
 am_temp: ds 4
 result: ds 4
+total_temp: ds 4
 
 BSEG
 mf: dbit 1
@@ -36,6 +37,7 @@ CE_ADC    EQU  P1.3
 MY_MOSI   EQU  P1.2  
 MY_MISO   EQU  P1.1 
 MY_SCLK   EQU  P1.0 
+T1LOAD    EQU (0x100 - (22118400/(16*115200)))
 
 $NOLIST
 $include(LCD_4bit.inc)
@@ -97,16 +99,9 @@ find_temp:
 	lcall convert_ADC
 	lcall Amb_temp
 	;clr AMTH_flag
-	LCD_cursor(2,7) ;NOT SURE
+	Set_Cursor(2,7) ;NOT SURE
 	lcall add_th_am
 	ljmp find_temp
-
-Th:
-	mov b, #1
-	lcall convert_ADC
-	lcall Thermo_temp
-	setb AMTH_flag
-	lcall find_temp
 
 
 Thermo_temp:
