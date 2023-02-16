@@ -96,6 +96,8 @@ FindTemp:
     lcall get_ADC
     lcall solve_AM
     Set_Cursor(2,7)
+    Send_Constant_String(bcd+1)
+ 	Send_Constant_String(bcd+0)
     lcall add_th_am
     ljmp FindTemp
 
