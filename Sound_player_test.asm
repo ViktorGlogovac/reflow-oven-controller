@@ -302,7 +302,7 @@ play_100:
 FSM2_2:
 	mov a, state2
 	cjne a, #2, FSM2_3
-	jb SPEAKER, FSM2_2
+	jnb SPEAKER, FSM2_2
 	mov state2, #3
 	ljmp FSM2_3
 
@@ -428,7 +428,7 @@ play_20:
 FSM2_4:
 	mov a, state2
 	cjne a, #4, FSM2_5
-	jb SPEAKER, FSM2_4
+	jnb SPEAKER, FSM2_4
 	mov state2, #5
 	ljmp FSM2_5
 
@@ -586,7 +586,7 @@ check_1:
 FSM2_6:
 	mov a, state2
 	cjne a, #6, FSM2_7
-	jb SPEAKER, FSM2_6
+	jnb SPEAKER, FSM2_6
 	mov state2, #7
 	ljmp FSM2_7
 	
