@@ -1,10 +1,8 @@
 
-
 ; standard library
 $NOLIST
 $MODLP52
 $LIST
-$include(macros.inc)
 $include(math32.inc)
 $include(LCD_4bit.inc)
 
@@ -53,6 +51,10 @@ RESET_PB equ P0.0
 START_PB equ P0.6
 RETURN_PB equ P0.7
 
+;SSR box 
+
+SSR equ P
+
 RESET_STATE     equ     0
 RAMP_TO_SOAK	equ     1
 PREHEAT_SOAK	equ     2
@@ -80,7 +82,9 @@ y:          ds  4
 
 bseg
 half_seconds_flag: dbit 1 ; Set to one in the ISR every time 500 ms had passed
-reset_timer_flag: dbit 1
+reset_timer_flag:  dbit 1
+safetycheck_flag:  dbit 1
+start_flag:        dbit 1
 
 Initial_Message:  db 'TS  tS  TR  tR', 0
 time_soak_msg:    db 'SOAK TEMP:     <', 0
@@ -118,6 +122,11 @@ mov a, %0
 movx @dptr, a
 inc dptr
 endmac
+
+; -------------------------;
+; Initialize Timer 2	   ;
+; -------------------------;
+
 
 Timer2_Init:
 	mov r0, #0x00 ;am/pm alarm
@@ -296,6 +305,7 @@ main:
     lcall Timer2_Init
     setb EA
     setb half_seconds_flag
+    clr safetycheck_flag
     ;initialize
 
     lcall LCD_4BIT
@@ -303,12 +313,12 @@ main:
 
 Update_LCD:
     ; update main screen values
-    LCD_cursor(2, 12)
-    LCD_printBCD(seconds)
+    Set_Cursor(2, 12)
+    Send_Constant_StringBCD(seconds)
     lcall SendVoltage
     Display_formated_BCD(Oven_temp, 1, 12)
-    LCD_cursor(1, 16)
-    LCD_printChar(#'C')
+    Set_Cursor(1, 16)
+    Send_Constant_StringChar(#'C')
     ljmp 	main_button_start
 
 FSM1:
@@ -317,10 +327,10 @@ FSM1:
     mov segBCD+0, seconds
 
 FSM1_ERROR:
-    LCD_cursor(1,1)
-  	LCD_print(#error)
-  	LCD_cursor(2,1)
-  	LCD_print(#error2)
+    Set_Cursor(1,1)
+  	Send_Constant_String(#error)
+  	Set_Cursor(2,1)
+  	Send_Constant_String(#error2)
     Wait_Milli_Seconds(#500)
     ljmp FSM1_state0
 
@@ -329,9 +339,10 @@ FSM1_Return_state0:
 
 FSM1_state0:
 
-    jb START_PB, START_PRESSED
     cjne a, #0, FSM1_state1
-    mov pwm, #0
+    jb START_PB, START_PRESSED
+    mov pwm_ratio+0, #low(0)
+	mov pwm_ratio+1, #high(0)
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
     lcall Load_Configuration
 	Set_Cursor(1, 1)
@@ -410,16 +421,24 @@ loop_1:
 START_PRESSED:
 mov FSM1_state, #1
 
-
 FSM1_state0_done:
 ljmp FSM2
 
 FSM1_state1:
 cjne a, #1, FSM1_state2
-mov pwm, #100
-mov a, #60d
+mov pwm_ratio+0, #low(1000)
+mov pwm_ratio+1, #high(1000)
+jb safetycheck_flag, Safety_Passed
+cjge temp, #50, set_flag
+mov a, #60
 subb a, seconds
 jz FSM1_ERROR
+sjmp FSM1_state1
+
+set_flag:
+SETB safetycheck_flag
+
+Safety_Passed:
 mov a, temp_soak
 clr c
 subb a, temp
@@ -433,7 +452,8 @@ ljmp FSM2
 
 FSM1_state2:
 cjne a, #2, FSM1_state3
-mov pwm, #20
+mov pwm_ratio+0, #low(200)
+mov pwm_ratio+1, #high(200)
 mov a, time_soak
 clr c
 subb a, sec
@@ -447,7 +467,8 @@ ljmp FSM2
 
 FSM1_state3:
 cjne a, #3, FSM1_state4
-mov pwm, #100
+mov pwm_ratio+0, #low(1000)
+mov pwm_ratio+1, #high(1000)
 mov a, reflow_temp
 clr c
 subb a, oven_temp
@@ -461,7 +482,8 @@ ljmp FSM2
 
 FSM1_state4: 
 cjne a, #4, FSM1_state5
-mov pwm, #20
+mov pwm_ratio+0, #low(200)
+mov pwm_ratio+1, #high(200)
 mov a, Time_refl
 clr c,
 subb a , Time_soak
@@ -473,7 +495,8 @@ ljmp FSM2
 
 FSM1_state5:
 cjne a, #5,  
-mov pwm, #0
+mov pwm_ratio+0, #low(0)
+mov pwm_ratio+1, #high(0)
 mov a, #60
 clr c
 subb a, reflow temp
