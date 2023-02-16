@@ -24,8 +24,8 @@ Pins Assignment
 | P1.7          |               |
 | P2.0          |MY_SCLK (speaker) | YELLOW
 | P2.1          |MY_MISO (speaker) | GREEN
-| P2.2          |               |
-| P2.3          |POTENTIOMETER  |    BLUE
+| P2.2          |               |?????????
+| P2.3          |POTENTIOMETER  |    BLUE ????????
 | P2.4          |MY_MOSI (speaker) | BLUE
 | P2.5          |FLASH_CE (speaker) | WHITE
 | P2.6          |SPEAKER        | GREEN
