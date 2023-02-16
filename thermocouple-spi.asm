@@ -95,11 +95,30 @@ FindTemp:
     mov b, #0
     lcall get_ADC
     lcall solve_AM
-    Set_Cursor(2,7)
-    Send_Constant_String(bcd+1)
- 	Send_Constant_String(bcd+0)
+    ljmp Display_10_digit_BCD
     lcall add_th_am
     ljmp FindTemp
+
+Display_10_digit_BCD:
+	Set_Cursor(2, 7)
+	Display_BCD(bcd+4)
+	Display_BCD(bcd+3)
+	Display_BCD(bcd+2)
+	Display_BCD(bcd+1)
+	Display_BCD(bcd+0)
+	; Replace all the zeros to the left with blanks
+	Set_Cursor(2, 7)
+	Left_blank(bcd+4, skip_blank)
+	Left_blank(bcd+3, skip_blank)
+	Left_blank(bcd+2, skip_blank)
+	Left_blank(bcd+1, skip_blank)
+	mov a, bcd+0
+	anl a, #0f0h
+	swap a
+	jnz skip_blank
+	Display_char(#' ')
+skip_blank:
+	ret
 
 
 solve_TH:
