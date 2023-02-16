@@ -16,6 +16,7 @@ CLK           EQU 22118400  ; Microcontroller system crystal frequency in Hz
 SYSCLK        EQU 22118400  ; Microcontroller system clock frequency in Hz
 TIMER1_RATE   EQU 22050     ; 22050Hz is the sampling rate of the wav file we are playing
 TIMER1_RELOAD EQU 0x10000-(SYSCLK/TIMER1_RATE)
+SPEAKER  EQU P2.6
 TIMER2_RATE   EQU 1000      ; 1000Hz, for a timer tick of 1ms
 TIMER2_RELOAD EQU ((65536-(CLK/TIMER2_RATE)))
 BAUD 		  EQU 115200
@@ -28,7 +29,7 @@ MY_MOSI equ P0.2
 CE_ADC equ P0.3
 
 ;spi
-FLASH_CEs  EQU  P2.5
+FLASH_CE  EQU  P2.5
 MY_MOSIs   EQU  P2.4 
 MY_MISOs   EQU  P2.1
 MY_SCLKs   EQU  P2.0 
@@ -65,6 +66,8 @@ $include(math32.inc)
 $LIST
 
 PWM_OUTPUT    equ P1.0 ; Attach an LED (with 1k resistor in series) to P1.0
+dseg at 30H
+	w: ds 3
 DSEG at 0x30; Before the state machine!
 FSM1_state:      ds 1
 state2: ds 1
@@ -89,6 +92,7 @@ reset_timer_flag:  dbit 1
 safetycheck_flag:  dbit 1
 start_flag:        dbit 1
 mf: dbit 1
+sound_done: dbit 1
 
 
 
@@ -117,6 +121,133 @@ state3message: 	  db 'RamptoPeak 3    ', 0
 state4message: 	  db 'Reflow 4        ', 0
 state5message: 	  db 'Cooling 5       ', 0
  
+;-------------------------------------;
+; ISR for Timer 1.  Used to playback  ;
+; the WAV file stored in the SPI      ;
+; flash memory.                       ;
+;-------------------------------------;
+
+
+; Approximate index of sounds in file 'C:\Users\takau\OneDrive\Desktop\elec_291\Sound_New\Sound_oven-sound-9-1.wav'
+sound_index:
+    db 0x00, 0x38, 0xa4 ; 0 start
+    db 0x00, 0x65, 0x0e ; 1 ramp to soak
+    db 0x00, 0xd2, 0x8d ; 2 soak
+    db 0x01, 0x22, 0x8d ; 3 ramp to peak
+    db 0x01, 0x89, 0x8d ; 4 reflow
+    db 0x01, 0xe7, 0x0d ; 5 cooling
+    db 0x02, 0x2e, 0x0d ; 6 finished
+    db 0x02, 0x7b, 0x8d ; 7 deg c
+    db 0x03, 0x00, 0xcd ; 8 1
+    db 0x03, 0x3a, 0x0d ; 9 2
+    db 0x03, 0x78, 0x8d ; 10 3
+    db 0x03, 0xbf, 0x58 ; 11 4
+    db 0x04, 0x09, 0x0d ; 12 5
+    db 0x04, 0x4e, 0x4d ; 13 6
+    db 0x04, 0x92, 0x8d ; 14 7
+    db 0x04, 0xd9, 0x40 ; 15 8
+    db 0x05, 0x14, 0x01 ; 16 9
+    db 0x05, 0x5e, 0xcd ; 17 10
+    db 0x05, 0x9a, 0x4d ; 18 11
+    db 0x05, 0xe4, 0x06 ; 19 12
+    db 0x06, 0x1e, 0xcd ; 20 13
+    db 0x06, 0x6b, 0xce ; 21 14
+    db 0x06, 0xb3, 0xc9 ; 22 15
+    db 0x06, 0xf3, 0x0e ; 23 16
+    db 0x07, 0x38, 0xce ; 24 17
+    db 0x07, 0x85, 0x3c ; 25 18
+    db 0x07, 0xc2, 0xcd ; 26 19
+    db 0x08, 0x0e, 0x8d ; 27 20
+    db 0x08, 0x45, 0x4d ; 28 30
+    db 0x08, 0x8b, 0x7d ; 29 40
+    db 0x08, 0xcf, 0xce ; 30 50
+    db 0x09, 0x14, 0xcd ; 31 60
+    db 0x09, 0x5e, 0xce ; 32 70
+    db 0x09, 0xb3, 0x2b ; 33 80
+    db 0x09, 0xf4, 0x8d ; 34 90
+    db 0x0a, 0x42, 0x09 ; 35 100
+    db 0x0a, 0x86, 0x0d ; 36 200
+
+; Size of each sound in 'sound_index'
+Size_sound:
+    db 0x00, 0x2c, 0x6a ; 0 
+    db 0x00, 0x6d, 0x7f ; 1 
+    db 0x00, 0x50, 0x00 ; 2 
+    db 0x00, 0x67, 0x00 ; 3 
+    db 0x00, 0x5d, 0x80 ; 4 
+    db 0x00, 0x47, 0x00 ; 5 
+    db 0x00, 0x45, 0x80 ; 6 
+    db 0x00, 0x85, 0x40 ; 7 
+    db 0x00, 0x39, 0x40 ; 8 
+    db 0x00, 0x3e, 0x80 ; 9 
+    db 0x00, 0x46, 0xcb ; 10 
+    db 0x00, 0x49, 0xb5 ; 11 
+    db 0x00, 0x45, 0x40 ; 12 
+    db 0x00, 0x44, 0x40 ; 13 
+    db 0x00, 0x46, 0xb3 ; 14 
+    db 0x00, 0x31, 0x80 ; 15 
+    db 0x00, 0x4a, 0xcc ; 16 
+    db 0x00, 0x3b, 0x80 ; 17 
+    db 0x00, 0x49, 0xb9 ; 18 
+    db 0x00, 0x3a, 0xc7 ; 19 
+    db 0x00, 0x4d, 0x01 ; 20 
+    db 0x00, 0x47, 0xfb ; 21 
+    db 0x00, 0x3f, 0x45 ; 22 
+    db 0x00, 0x45, 0xc0 ; 23 
+    db 0x00, 0x4c, 0x6e ; 24 
+    db 0x00, 0x3d, 0x91 ; 25 
+    db 0x00, 0x4b, 0xc0 ; 26 
+    db 0x00, 0x36, 0xc0 ; 27 
+    db 0x00, 0x46, 0x30 ; 28 
+    db 0x00, 0x44, 0x51 ; 29 
+    db 0x00, 0x44, 0xff ; 30 
+    db 0x00, 0x4a, 0x01 ; 31 
+    db 0x00, 0x54, 0x5d ; 32 
+    db 0x00, 0x41, 0x62 ; 33 
+    db 0x00, 0x4d, 0x7c ; 34 
+    db 0x00, 0x44, 0x04 ; 35 
+    db 0x00, 0x4c, 0x42 ; 36 
+
+Timer1_ISR:
+	; The registers used in the ISR must be saved in the stack
+	push acc
+	push psw
+	
+	; Check if the play counter is zero.  If so, stop playing sound.
+	mov a, w+0
+	orl a, w+1
+	orl a, w+2
+	jz stop_playing
+	
+	; Decrement play counter 'w'.  In this implementation 'w' is a 24-bit counter.
+	mov a, #0xff
+	dec w+0
+	cjne a, w+0, keep_playing
+	dec w+1
+	cjne a, w+1, keep_playing
+	dec w+2
+	
+keep_playing:
+	setb SPEAKER
+	lcall Send_SPI ; Read the next byte from the SPI Flash...
+	mov P0, a ; WARNING: Remove this if not using an external DAC to use the pins of P0 as GPIO
+	add a, #0x80
+	mov DADH, a ; Output to DAC. DAC output is pin P2.3
+	orl DADC, #0b_0100_0000 ; Start DAC by setting GO/BSY=1
+	sjmp Timer1_ISR_Done
+
+stop_playing:
+	clr TR1 ; Stop timer 1
+	setb FLASH_CE  ; Disable SPI Flash
+	clr SPEAKER ; Turn off speaker.  Removes hissing noise when not playing sound.
+	mov DADH, #0x80 ; middle of range
+	orl DADC, #0b_0100_0000 ; Start DAC by setting GO/BSY=1
+	setb sound_done
+
+Timer1_ISR_Done:	
+	pop psw
+	pop acc
+	reti
 
 
 ;---------------------------------;
@@ -454,7 +585,8 @@ main:
 	mov P0M1, #0
     mov seconds, #0x00
     mov FSM1_state, #0
-
+	
+	
 	lcall Load_Configuration
 
 	lcall Timer2_Init
@@ -556,6 +688,7 @@ FSM1_state0:
 
 FSM1_state0_done:
 ;	ljmp FSM1_FSM2 ; audio stuff
+	ljmp FSM2_0
 	ljmp loop
 	
 FSM1_ERROR_b:
@@ -661,8 +794,230 @@ FSM_state5to0:
 FSM1_state5_done:
 	ljmp loop_temp
 
-END
+;FSM2
+FSM2_0:
 
+FSM2_1:
+	mov a, state2
+	cjne a, #1, FSM2_2
+	mov state2, #2
+	ljmp FSM2_2
+
+FSM2_2:
+	mov a, state2
+	cjne a, #2, FSM2_3
+	ljmp check_r2s
+
+Timer2_ISR_done_b1:
+	ljmp Timer2_ISR_done	
+sec_b1:
+	ljmp sec
+	
+check_r2s:
+	mov a, FSM1_state
+	cjne a, #1, check_soak
+	mov R2, #2
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+	
+check_soak:
+	mov a, FSM1_state
+	cjne a, #2, check_r2p
+	mov R2, #3
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+
+check_r2p:
+	mov a, FSM1_state
+	cjne a, #3, check_reflow
+	mov R2, #4
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+
+check_reflow:
+	mov a, FSM1_state
+	cjne a, #4, check_cooling
+	mov R2, #5
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+	
+FSM2_0_b1:
+	ljmp FSM2_0
+	
+check_cooling:
+	mov a, FSM1_state
+	cjne a, #5, check_finish
+	mov R2, #6
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+	
+check_finish:
+	mov a, FSM1_state
+	cjne a, #6, FSM2_3
+	mov R2, #7
+	lcall Play_sound
+	mov state2, #3
+	ljmp FSM2_3
+
+FSM2_3:
+	mov a, state2
+	cjne a, #3, FSM2_0_b1
+	mov a, #0
+	mov state2, #1
+	ljmp FSM1_state0
+sec:
+	mov sec_counter, a
+	
+
+
+
+;---------------------------------;
+; Sends AND receives a byte via   ;
+; SPI.                            ;
+;---------------------------------;
+spi:
+Send_SPI:
+	SPIBIT MAC
+	    ; Send/Receive bit %0
+		rlc a
+		mov MY_MOSI, c
+		setb MY_SCLK
+		mov c, MY_MISO
+		clr MY_SCLK
+		mov acc.0, c
+	ENDMAC
+	
+	SPIBIT(7)
+	SPIBIT(6)
+	SPIBIT(5)
+	SPIBIT(4)
+	SPIBIT(3)
+	SPIBIT(2)
+	SPIBIT(1)
+	SPIBIT(0)
+
+	ret
+
+init:
+	; Configure P2.0, P2.4, P2.5 as open drain outputs
+	orl P2M0, #0b_0011_0001
+	orl P2M1, #0b_0011_0001
+	setb MY_MISO  ; Configured as input
+	setb FLASH_CE ; CS=1 for SPI flash memory
+	clr MY_SCLK   ; Rest state of SCLK=0
+	clr SPEAKER   ; Turn off speaker.
+	
+	; Configure timer 1
+	anl	TMOD, #0x0F ; Clear the bits of timer 1 in TMOD
+	orl	TMOD, #0x10 ; Set timer 1 in 16-bit timer mode.  Don't change the bits of timer 0
+	mov TH1, #high(TIMER1_RELOAD)
+	mov TL1, #low(TIMER1_RELOAD)
+	; Set autoreload value
+	mov RH1, #high(TIMER1_RELOAD)
+	mov RL1, #low(TIMER1_RELOAD)
+
+	; Enable the timer and interrupts
+    setb ET1  ; Enable timer 1 interrupt
+	; setb TR1 ; Timer 1 is only enabled to play stored sound
+
+	; Configure the DAC.  The DAC output we are using is P2.3, but P2.2 is also reserved.
+	mov DADI, #0b_1010_0000 ; ACON=1
+	mov DADC, #0b_0011_1010 ; Enabled, DAC mode, Left adjusted, CLK/4
+	mov DADH, #0x80 ; Middle of scale
+	mov DADL, #0
+	orl DADC, #0b_0100_0000 ; Start DAC by GO/BSY=1
+check_DAC_init:
+	mov a, DADC
+	jb acc.6, check_DAC_init ; Wait for DAC to finish	
+	setb EA ; Enable interrupts	
+	ret
+	
+Play_sound:
+	clr sound_done
+	clr TR1 ; stops timer 1 ISR from playing previous request
+	setb FLASH_CE
+	clr SPEAKER ; turn off speaker
+	
+	clr FLASH_CE ; enable SPI flash
+	mov a, #READ_BYTES
+	lcall Send_SPI ; set initial position in memory where to start playing
+
+	mov dptr, #sound_index ; The beginning of the index (3 bytes per entry)
+	; multiply R0 by 3 and add it to the dptr
+	mov a, R2
+	mov b, #3
+	mul ab
+	add a, dpl
+	mov dpl, a
+	mov a, b
+	addc a, dph
+	mov dph, a
+	
+	; dptr is pointing to the MSB of the 24-bit flash memory address
+	clr a
+	movc a, @a+dptr
+	lcall spi
+	
+	inc dptr
+	clr a
+	movc a, @a+dptr
+	lcall spi
+	
+	inc dptr
+	clr a
+	movc a, @a+dptr
+	lcall spi
+	
+	mov dptr, #size_sound
+	
+	mov a, R2
+	mov b, #3
+	mul ab
+	add a, dpl
+	mov dpl, a
+	mov a, b
+	addc a, dph
+	mov dph, a
+	
+	; dptr is pointing to the MSB of the 24-bit flash memory address
+	clr a
+	movc a, @a+dptr
+	mov w+2, a
+	
+	inc dptr
+	clr a
+	movc a, @a+dptr
+	mov w+1, a
+	
+	inc dptr
+	clr a
+	movc a, @a+dptr
+	mov w+0, a
+	
+	setb SPEAKER ; turn on speaker
+	setb TR1 ; start playback by enabling timer 1
+	ret
+	
+main_2:
+	mov SP, #0x7f ; Setup stack pointer to the start of indirectly accessable data memory minus one
+    lcall Init ; Initialize the hardware
+    mov sec_counter, #0x00
+    setb sound_done
+    lcall Timer2_Init
+	setb EA
+    setb half_seconds_flag
+    mov state2, #1
+
+loop_2:
+
+	ljmp loop_2
+
+END
 
 
 
