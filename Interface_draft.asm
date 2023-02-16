@@ -1,4 +1,3 @@
-
 ; standard library
 $NOLIST
 $MODLP52
@@ -50,6 +49,8 @@ TIME_REFL_PB equ P0.1
 RESET_PB equ P0.0
 START_PB equ P0.6
 RETURN_PB equ P0.7
+FAHRENHEIT_PB equ 
+
 
 ;SSR box 
 
@@ -338,9 +339,9 @@ FSM1_Return_state0:
 
 
 FSM1_state0:
-
     cjne a, #0, FSM1_state1
     jb START_PB, START_PRESSED
+    jb FAHRENHEIT_PB, fahrenheit
     mov pwm_ratio+0, #low(0)
 	mov pwm_ratio+1, #high(0)
     ; For convenience a few handy macros are included in 'LCD_4bit.inc':
@@ -360,6 +361,17 @@ FSM1_state0:
     mov a, time_refl
 	lcall SendToLCD
 	
+fahrenheit:
+    push acc
+	load_Y(9)
+	lcall mul32
+	load_Y(5)
+	lcall div32
+	load_Y(32)
+	lcall add32
+	pop acc
+	ret
+
 	; After initialization the program stays in this 'forever' loop
 loop:
 
