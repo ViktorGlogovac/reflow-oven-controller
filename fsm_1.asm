@@ -488,6 +488,7 @@ Load_Configuration:
 
 ; Load defaults if 'keys' are incorrect
 Load_Defaults:
+	
 	mov temp_soak, #39
 	mov time_soak, #45
 	mov temp_refl, #225
@@ -641,33 +642,30 @@ Send_Constant_String(#temp_soak_msg)
 display_temp(x)
 mov pwm_ratio+0, #low(1000)
 mov pwm_ratio+1, #high(1000)
-;jb safetycheck_flag, Safety_Passed
+jb safetycheck_flag, Safety_Passed
 sjmp check_safety
 
-FSM1_state0_done_b1:
-	ljmp FSM1_state0_done
+;FSM1_state0_done_b1:
+;	ljmp FSM1_state0_done
 
 check_safety:
 mov a, x
-cjne a, #0x30, check_time
+cjne a, #50, check_time
 ljmp set_flag
 
 check_time:
 mov a, seconds
-cjne a, #0x60, FSM1_state0_done_b1
+cjne a, #60, Safety_Passed
 ljmp FSM1_ERROR_b
 
 set_flag:
-;SETB safetycheck_flag
+SETB safetycheck_flag
 
 Safety_Passed:
 mov a, temp_soak
 clr c
-mov b, x
-div ab
-cjne a, #0, FSM1_state0_done_b1
-;subb a, temp
-;jnc FSM1_state1_done
+subb a, x
+jnc FSM1_state1_done
 mov FSM1_state, #2
 mov seconds, #0
 
@@ -676,13 +674,18 @@ ljmp loop_temp
 
 FSM1_ERROR_b:
 ljmp FSM1_ERROR
+FSM1_state3_b1:
+	ljmp FSM1_state3	
 
 FSM1_state2:
-cjne a, #2, FSM1_state3
+cjne a, #2, FSM1_state3_b1
 Set_Cursor(1, 1)
 Send_Constant_String(#state2message)
+Set_Cursor(1, 13)
+Display_BCD(seconds)
 Set_Cursor(2, 1)
 Send_Constant_String(#state2message)
+display_temp(x)
 mov pwm_ratio+0, #low(200)
 mov pwm_ratio+1, #high(200)
 mov a, time_soak
@@ -690,12 +693,11 @@ clr c
 subb a, seconds
 jnc FSM1_state2_done
 mov FSM1_state, #3
-setb reset_timer_flag
-clr reset_timer_flag
+mov seconds, #0x00
 
 FSM1_state2_done:
 	ljmp loop_temp
-	
+
 FSM1_state0_B:
 ljmp FSM1_state0
 
