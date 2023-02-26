@@ -160,19 +160,19 @@ loop:
 	clr FLASH_CE ; enable SPI flash
 	mov a, #READ_BYTES
 	lcall Send_SPI ; set initial position in memory where to start playing
-	mov a, #0x02
+	mov a, #0x08
 	lcall Send_SPI
-	mov a, #0x00
+	mov a, #0xC9
 	lcall Send_SPI
-	mov a, #0x00
+	mov a, #0xEC
 	lcall Send_SPI
 	mov a, #0x00 ; Request first byte to send to DAC
 	lcall Send_SPI
 	
 	; how many bytes to play?
 	mov w+2, #0x00
-	mov w+1, #0x50
-	mov w+0, #0x00
+	mov w+1, #0x46
+	mov w+0, #0x50
 	
 	setb SPEAKER ; turn on speaker
 	setb TR1 ; start playback by enabling timer 1
